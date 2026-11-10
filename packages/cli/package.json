@@ -100,7 +100,6 @@
 		"minimatch": "11.0.5",
 		"minisearch": "7.2.0",
 		"msw": "3.0.4",
-		"onesixty": "0.2.0",
 		"semver": "7.8.6",
 		"shell-quote": "^1.12.0",
 		"string-width": "8.3.0",

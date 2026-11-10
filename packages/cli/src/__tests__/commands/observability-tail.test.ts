@@ -2,13 +2,14 @@ import { writeFile } from "node:fs/promises";
 import { runInTempDir } from "@cloudflare/workers-utils/test-helpers";
 import { http, HttpResponse } from "msw/http";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { filterSchema } from "../../commands/observability/tail/filter-schema.js";
 import {
 	scopeTailFilters,
 	tailFilters,
 	zoneFilter,
 } from "../../commands/observability/tail/filters.js";
 import { runLiveTail } from "../../commands/observability/tail/stream.js";
-import { mockOutputStreams } from "../helpers/capture-output.js";
+import { captureOutput, mockOutputStreams } from "../helpers/capture-output.js";
 import { server, setupMsw, TEST_BASE_URL } from "../helpers/msw.js";
 import { runCf } from "../helpers/run-cf.js";
 
@@ -77,17 +78,27 @@ describe("cf observability tail", () => {
 		async ({ flags }) => {
 			vi.stubEnv("CLOUDFLARE_ZONE_ID", "0123456789abcdef0123456789abcdef");
 			await expect(runTail([...flags])).rejects.toThrow(
-				/--all.*--worker.*--zone.*--filter/
+				/--all.*--worker.*--zone.*--filters/
 			);
 			expect(runLiveTail).not.toHaveBeenCalled();
 		}
 	);
 
 	it("resolves a zone name and narrows it with a filter", async () => {
-		const expression = '$metadata.level = "error"';
-		await runTail(["--zone", "Example.COM", "--filter", expression], API_ENV);
+		const input = JSON.stringify({
+			filterCombination: "and",
+			filters: [
+				{
+					key: "$metadata.level",
+					type: "string",
+					operation: "eq",
+					value: "error",
+				},
+			],
+		});
+		await runTail(["--zone", "Example.COM", "--filters", input], API_ENV);
 		expect(tailOptions()?.body).toEqual(
-			scopeTailFilters(tailFilters(expression), zoneFilter("example.com"))
+			scopeTailFilters(tailFilters(input), zoneFilter("example.com"))
 		);
 		expect(workerLookup).not.toHaveBeenCalled();
 	});
@@ -151,7 +162,7 @@ describe("cf observability tail", () => {
 			["--all", "--worker", "my-worker"],
 			["--all", "--zone", "example.com"],
 			["--worker", "my-worker", "--zone", "example.com"],
-			["--all", "--filter", 'level = "error"'],
+			["--all", "--filters", "{}"],
 		].map((flags) => ({ flags }))
 	)(
 		"rejects conflicting selections before authenticating ($flags)",
@@ -164,10 +175,20 @@ describe("cf observability tail", () => {
 		}
 	);
 
-	it("uses --filter alone to select matching observability events", async () => {
-		const expression = '$metadata.level = "error"';
-		await runTail(["--filter", expression], API_ENV);
-		expect(tailOptions()?.body).toEqual(tailFilters(expression));
+	it("uses --filters alone to select matching observability events", async () => {
+		const input = JSON.stringify({
+			filterCombination: "and",
+			filters: [
+				{
+					key: "$metadata.level",
+					type: "string",
+					operation: "eq",
+					value: "error",
+				},
+			],
+		});
+		await runTail(["--filters", input], API_ENV);
+		expect(tailOptions()?.body).toEqual(tailFilters(input));
 	});
 
 	it.each(
@@ -189,13 +210,28 @@ describe("cf observability tail", () => {
 			"cloudflare.config.ts",
 			'export default { accountId: "fixture-account", workers: [{ name: "other-worker", bindings: "invalid-on-purpose" }] };'
 		);
-		const expression =
-			'$metadata.level = "error" OR $metadata.message = "*private search*"';
+		const input = JSON.stringify({
+			filterCombination: "or",
+			filters: [
+				{
+					key: "$metadata.level",
+					type: "string",
+					operation: "eq",
+					value: "error",
+				},
+				{
+					key: "$metadata.message",
+					type: "string",
+					operation: "includes",
+					value: "private search",
+				},
+			],
+		});
 		vi.mocked(runLiveTail).mockImplementationOnce(async () => {
 			expect(workerLookup).toHaveBeenCalledOnce();
 		});
 		await runTail(
-			["--worker", "my-worker-staging", "--filter", expression],
+			["--worker", "my-worker-staging", "--filters", input],
 			API_ENV
 		);
 		expect(workerLookup).toHaveBeenCalledWith(
@@ -205,7 +241,7 @@ describe("cf observability tail", () => {
 		);
 		expect(tailOptions()).toMatchObject({
 			accountId: "fixture-account",
-			body: { scriptId: "my-worker-staging", ...tailFilters(expression) },
+			body: { scriptId: "my-worker-staging", ...tailFilters(input) },
 		});
 		expect(std.out).toBe("");
 		expect(std.err).not.toMatch(/private search|fixture-token/);
@@ -257,16 +293,70 @@ describe("cf observability tail", () => {
 	});
 
 	it("rejects invalid filters before authenticating", async () => {
-		await expect(runTail(["--filter", "x ="])).rejects.toThrow(
-			/Invalid --filter/
+		await expect(runTail(["--filters", "{"])).rejects.toThrow(
+			/Invalid JSON.*--filters/
 		);
 		expect(runLiveTail).not.toHaveBeenCalled();
 	});
 
-	it("requires one expression when --filter is repeated", async () => {
+	it("requires JSON filters to be provided once", async () => {
 		await expect(
-			runTail(["--filter", "x = 1", "--filter", "y = 2"])
-		).rejects.toThrow(/single.*filter/i);
+			runTail(["--filters", "{}", "--filters", "{}"])
+		).rejects.toThrow(/filters.*once/i);
+		expect(runLiveTail).not.toHaveBeenCalled();
+	});
+
+	it("reads nested filters from a relative file and preserves JSON value types", async () => {
+		const filters = {
+			filterCombination: "and",
+			filters: [
+				...(filterSchema.examples[1]?.filters ?? []),
+				{
+					kind: "group",
+					filterCombination: "or",
+					filters: [
+						{
+							key: "$workers.cpuTimeMs",
+							type: "number",
+							operation: "gt",
+							value: 50,
+						},
+						{ key: "cached", type: "boolean", operation: "eq", value: true },
+					],
+				},
+			],
+		};
+		await writeFile("filters.json", JSON.stringify(filters));
+		await runTail(["--filters", "@filters.json"], API_ENV);
+		expect(tailOptions()?.body).toEqual(filters);
+	});
+
+	it.each([
+		"[]",
+		"{}",
+		'{"filterCombination":"xor","filters":[]}',
+		'{"filterCombination":"and","filters":{}}',
+		'{"filterCombination":"and","filters":[],"scriptId":"other"}',
+	])(
+		"rejects an invalid filter envelope before authenticating: %s",
+		async (input) => {
+			await expect(runTail(["--filters", input])).rejects.toThrow(
+				/filters.*(JSON object|requires)/
+			);
+			expect(runLiveTail).not.toHaveBeenCalled();
+		}
+	);
+
+	it("exposes the complete nested filter schema without credentials", async () => {
+		const output = captureOutput();
+		await runCf(["schema", "observability", "tail"]);
+		const schema = JSON.parse(output.stdout());
+		expect(schema.optionSchemas.filters).toEqual(filterSchema);
+		output.clear();
+		await runCf(["schema", "--list"]);
+		expect(JSON.parse(output.stdout())).toContainEqual({
+			command: "cf observability tail",
+		});
 		expect(runLiveTail).not.toHaveBeenCalled();
 	});
 
@@ -274,7 +364,7 @@ describe("cf observability tail", () => {
 		await expect(runTail(["--help"])).resolves.toEqual({
 			exitCode: 0,
 		});
-		expect(std.out).toContain("--filter");
+		expect(std.out).toContain("--filters");
 		expect(workerLookup).not.toHaveBeenCalled();
 		expect(runLiveTail).not.toHaveBeenCalled();
 	});
@@ -289,8 +379,13 @@ describe("cf observability tail", () => {
 	it.each([
 		{ flags: ["--all"], body: tailFilters() },
 		{
-			flags: ["--worker", "my-worker", "--filter", 'message = "*hello*"'],
-			body: { scriptId: "my-worker", ...tailFilters('message = "*hello*"') },
+			flags: [
+				"--worker",
+				"my-worker",
+				"--filters",
+				JSON.stringify(filterSchema.examples[0]),
+			],
+			body: { scriptId: "my-worker", ...filterSchema.examples[0] },
 		},
 		{
 			flags: ["--zone", "example.com"],

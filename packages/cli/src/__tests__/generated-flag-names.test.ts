@@ -24,7 +24,11 @@ interface ParamInfo {
 	flag?: string;
 	positional?: true;
 }
-const schemas = schemasFile.schemas as Record<
+const schemas = Object.fromEntries(
+	Object.entries(schemasFile.schemas).filter(
+		([, schema]) => "operationId" in schema
+	)
+) as Record<
 	string,
 	{
 		pathParams: ParamInfo[];

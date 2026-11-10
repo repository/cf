@@ -80,6 +80,9 @@ describe("created roots", () => {
 		};
 		expect(meta.descriptions["previews"]).toBe("Manage Worker Previews");
 		expect(meta.commands.map((c) => c.command)).toContain("cf previews deploy");
+		expect(
+			JSON.parse(read(files, "_meta/schemas.json")).schemas
+		).not.toHaveProperty("observability tail");
 	});
 
 	it("preserves the schema-provided parent when it arrives", () => {
@@ -113,6 +116,29 @@ describe("created roots", () => {
 				])
 			)
 		).toThrow("createIfMissing only supports top-level command roots.");
+	});
+});
+
+describe("hand-written schemas", () => {
+	it("publishes a standalone schema without a corresponding API operation", () => {
+		const files = generateFiles(doc([]), {
+			handWritten: [
+				...handWrittenCommands.filter(
+					(entry) => entry.kind === "leaf" && entry.parent === "observability"
+				),
+				{
+					kind: "parentOverride",
+					parent: "observability",
+					describe: "Observability",
+					expose: true,
+					createIfMissing: true,
+				},
+			],
+			sidecars: handWrittenMeta,
+		});
+		expect(JSON.parse(read(files, "_meta/schemas.json")).schemas).toEqual({
+			"observability tail": handWrittenMeta.schemas["observability tail"],
+		});
 	});
 });
 

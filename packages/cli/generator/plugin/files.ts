@@ -1171,6 +1171,14 @@ ${entries.join(",\n")}
 		content: metadataFile(handMetas, handDescriptions),
 	});
 
+	for (const meta of w.metas) {
+		const path = fullPathOf(meta).join(" ");
+		const schema = hand.schema(path);
+		if (schema !== undefined) {
+			w.schemas.set(path, schema);
+		}
+	}
+
 	const schemas = [...w.schemas.entries()];
 	schemas.sort(([a], [b]) => localeCompare(a, b));
 	const schemaFile = obj([

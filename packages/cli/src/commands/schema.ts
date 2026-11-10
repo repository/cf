@@ -19,7 +19,7 @@ interface ParamInfo {
 	required: boolean;
 }
 
-interface SchemaInfo {
+interface ApiSchemaInfo {
 	operationId: string;
 	httpMethod: string;
 	path: string;
@@ -33,6 +33,10 @@ interface SchemaInfo {
 		description: string;
 	}[];
 }
+
+type SchemaInfo =
+	| ApiSchemaInfo
+	| { optionSchemas: Record<string, Record<string, unknown>> };
 
 interface SchemaFile {
 	version: string;
@@ -86,9 +90,13 @@ const schema: CommandModule<object, SchemaArgs> & { describe: string } = {
 			const summary = Object.entries(schemas.schemas).map(
 				([command, info]) => ({
 					command: `cf ${command}`,
-					httpMethod: info.httpMethod,
-					apiPath: info.path,
-					operationId: info.operationId,
+					...("operationId" in info
+						? {
+								httpMethod: info.httpMethod,
+								apiPath: info.path,
+								operationId: info.operationId,
+							}
+						: {}),
 				})
 			);
 			formatOutput(summary);

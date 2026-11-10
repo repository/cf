@@ -336,9 +336,6 @@ importers:
       msw:
         specifier: 3.0.4
         version: 3.0.4(@types/node@26.6.6)(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.39)(yaml@2.9.0))(graphql@16.14.2)(supports-color@10.2.2)(typescript@6.0.3)
-      onesixty:
-        specifier: 0.2.0
-        version: 0.2.0
       semver:
         specifier: 7.8.6
         version: 7.8.6
@@ -3289,9 +3286,6 @@ packages:
     resolution: {integrity: sha512-5vvB5+W7ePv+p3uqxi+RcW1XAzLW0/hxt3/4X4Lc4qHudzOhmBiBwOY6DRob4WnanAEGvNcLjF+KNOufrUoEQw==}
     engines: {node: '>=12.20.0'}
 
-  onesixty@0.2.0:
-    resolution: {integrity: sha512-MsGR1XB1ElaqMYW6mMGG7r67a+rZ8HmKpebYkyid5clKh/3dQZ3H0bhMFJT5i54ua35iIPCx4Pgi4yTu99lV4w==}
-
   onetime@5.1.2:
     resolution: {integrity: sha512-kbpaSSGJTWdAY5KPVeMOKXSrPtr8C8C7wodJbcsd51jRnmD+GZu8Y0VoU6Dm5Z4vWr0Ig/1NKuWRKf7j5aaYSg==}
     engines: {node: '>=6'}
@@ -6063,8 +6057,6 @@ snapshots:
   nanoid@3.3.20: {}
 
   obug@3.0.0: {}
-
-  onesixty@0.2.0: {}
 
   onetime@5.1.2:
     dependencies:

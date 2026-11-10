@@ -29,6 +29,7 @@ import docsMeta from "./docs/meta.js";
 import initMeta from "./init/meta.js";
 import loginMeta from "./login/meta.js";
 import migrateMeta from "./migrate/meta.js";
+import { filterSchema } from "./observability/tail/filter-schema.js";
 import observabilityTailMeta from "./observability/tail/meta.js";
 import pagesDeployMeta from "./pages/deploy/meta.js";
 import previewsDeployMeta from "./previews/deploy/meta.js";
@@ -102,9 +103,15 @@ export const handWrittenMeta = {
 		"ai/run": aiRunMeta,
 		"registrar/registrations/create": registrarRegistrationsCreateMeta,
 	},
+	schemas: {
+		"observability tail": {
+			optionSchemas: { filters: filterSchema },
+		},
+	},
 } satisfies {
 	roots: Record<HandWrittenDir<"root">, readonly CommandMeta[]>;
 	subgroups: Record<HandWrittenDir<"subgroup">, readonly CommandMeta[]>;
 	leaves: Record<HandWrittenDir<"leaf">, LeafCommandMeta>;
 	leafOverrides: Record<HandWrittenDir<"leafOverride">, LeafOverrideMeta>;
+	schemas: Record<string, { optionSchemas: Record<string, unknown> }>;
 };

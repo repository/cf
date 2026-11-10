@@ -598,7 +598,9 @@ process-backed Access leaves.
 
 `cf observability tail` is a streaming leaf that combines API calls into a
 live session. Its implementation stays in
-`src/commands/observability/tail/`.
+`src/commands/observability/tail/`. JSON filter input is documented through
+`cf schema observability tail`. Its standalone entry in the hand-written
+metadata's `schemas` map supplies `optionSchemas` for the generated catalogue.
 
 **Generated-parent override** (`kind: "parentOverride"`) — changes only the
 description and visibility of an existing generated product root. It does not

@@ -42,6 +42,8 @@ export interface Sidecars {
 	subgroups: Readonly<Record<string, readonly CommandMeta[]>>;
 	leaves: Readonly<Record<string, LeafCommandMeta>>;
 	leafOverrides: Readonly<Record<string, LeafOverrideMeta>>;
+	/** Standalone catalogue entries, keyed by command path. */
+	schemas?: Readonly<Record<string, Obj>>;
 }
 
 /** What the plugin is built with. */
@@ -165,6 +167,10 @@ export class HandWritten {
 	/** The fields an override's sidecar replaces. */
 	leafOverrideMeta(dir: string): Obj {
 		return json(sidecar(this.sidecars.leafOverrides, dir));
+	}
+
+	schema(commandPath: string): Obj | undefined {
+		return this.sidecars.schemas?.[commandPath];
 	}
 
 	/**

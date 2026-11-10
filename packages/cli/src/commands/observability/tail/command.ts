@@ -23,7 +23,7 @@ import getZone from "#operations/zones/get.js";
 function builder(yargs: Argv<CommonYargsOptions>) {
 	return yargs
 		.usage(
-			"$0 observability tail [options]\n\nStream live observability events. Select --all, --worker, --zone, or --filter."
+			"$0 observability tail [options]\n\nStream live observability events. Select --all, --worker, --zone, or --filters."
 		)
 		.option("all", {
 			type: "boolean",
@@ -40,17 +40,17 @@ function builder(yargs: Argv<CommonYargsOptions>) {
 				return worker;
 			},
 		})
-		.option("filter", {
+		.option("filters", {
 			type: "string",
 			requiresArg: true,
-			description: 'Filter expression, e.g. $metadata.level = "error"',
+			description: "Filters as a JSON object or @path/to/file.json",
 		})
 		.option("dry-run", {
 			type: "boolean",
 			default: false,
 			description: "Preview the live tail request",
 		})
-		.conflicts("all", "filter")
+		.conflicts("all", "filters")
 		.check((argv) => {
 			if (
 				argv.dryRun &&
@@ -63,10 +63,10 @@ function builder(yargs: Argv<CommonYargsOptions>) {
 				!argv.all &&
 				argv.worker === undefined &&
 				argv.zone === undefined &&
-				argv.filter === undefined
+				argv.filters === undefined
 			) {
 				throw new Error(
-					"Select events with --all, --worker <name>, --zone <id-or-domain>, or --filter <expression>."
+					"Select events with --all, --worker <name>, --zone <id-or-domain>, or --filters <json|@file>."
 				);
 			}
 			if (
@@ -77,32 +77,27 @@ function builder(yargs: Argv<CommonYargsOptions>) {
 				].filter(Boolean).length > 1
 			) {
 				throw new Error(
-					"Choose one scope: --all, --worker, or --zone. Use --filter with --worker or --zone to narrow its events."
+					"Choose one scope: --all, --worker, or --zone. Use --filters with --worker or --zone to narrow its events."
 				);
 			}
 			return true;
 		})
 		.example("cf observability tail --all", "Stream all observability events")
 		.example(
-			`cf observability tail --zone example.com --filter '$metadata.level = "error"'`,
-			"Match errors for a zone"
+			`cf observability tail --filters '{"filterCombination":"and","filters":[{"key":"$metadata.level","type":"string","operation":"eq","value":"error"}]}'`,
+			"Match errors"
 		)
 		.example(
-			`cf observability tail --worker my-worker --filter '$workers.outcome = "exception"'`,
-			"Match a Worker's exceptions"
+			"cf observability tail --worker my-worker --filters @filters.json",
+			"Apply saved filters to a Worker"
 		)
 		.example(
-			`cf observability tail --filter '($metadata.service = "my-worker" AND $metadata.level = "error") OR $metadata.message = "*failed*"'`,
-			"Match a Worker's errors or messages containing failed"
-		)
-		.example(
-			`cf observability tail --filter '$metadata.trigger = "GET *" AND $workers.cpuTimeMs > 50'`,
-			"Match GET requests using more than 50 ms of CPU time"
+			"cf observability tail --zone example.com --filters @filters.json",
+			"Apply saved filters to a zone and its subdomains"
 		)
 		.epilogue(
-			"Output is newline-delimited JSON. Worker events require Workers logs. Each user can run one live tail per Worker and one account live tail, shared by --all, --zone, and --filter alone. Streaming connections use HTTPS_PROXY and NO_PROXY. --worker requires Worker metadata access. --zone requires Zone read access. Choose one of --all, --worker, or --zone. Use --filter alone or with --worker or --zone. --filter alone selects matching observability events. --zone matches the recorded zone name. Events without a zone name are matched by HTTP request hostname, including subdomains.\n\n" +
-				"Filter syntax: =, !=, numeric < <= > >=, AND, OR, NOT, parentheses, and field:* for presence. OR binds more tightly than AND; use parentheses to group conditions. Groups can nest up to four levels.\n\n" +
-				'Quote string values; leave numbers and true/false unquoted. String matching is case-sensitive. Use * in quoted = values for wildcards. Bare text searches $metadata.message. NOT supports exact equality, presence checks, and "*text*" matches.\n\n' +
+			"Output is newline-delimited JSON. Worker events require Workers logs. Each user can run one live tail per Worker and one account live tail, shared by --all, --zone, and --filters alone. Streaming connections use HTTPS_PROXY and NO_PROXY. --worker requires Worker metadata access. --zone requires Zone read access. Choose one of --all, --worker, or --zone. Use --filters alone or with --worker or --zone. --filters alone selects matching observability events. --zone matches the recorded zone name. Events without a zone name are matched by HTTP request hostname, including subdomains.\n\n" +
+				'--filters accepts {"filterCombination":"and"|"or","filters":[...]}. Each entry is a condition or a nested group with kind: "group", filterCombination, and filters. Run cf schema observability tail for the complete JSON Schema and grouped examples.\n\n' +
 				"Use cf o11y telemetry keys and cf o11y telemetry values to discover fields and values."
 		);
 }
@@ -117,7 +112,7 @@ const command: CommandModule<CommonYargsOptions, Args> = {
 		if (argv.local) {
 			throw new Error("--local is not supported by cf observability tail.");
 		}
-		const filters = tailFilters(argv.filter);
+		const filters = tailFilters(argv.filters);
 		const context = await resolveTailContext(argv);
 		const body = {
 			...(argv.worker === undefined ? {} : { scriptId: argv.worker }),

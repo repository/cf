@@ -91,6 +91,7 @@
 		"@types/node": "26.6.6",
 		"@types/semver": "7.8.0",
 		"@types/shell-quote": "^1.7.5",
+		"@types/ws": "8.18.2",
 		"@types/yargs": "17.0.35",
 		"chalk": "6.0.1",
 		"ci-info": "^4.4.0",
@@ -99,6 +100,7 @@
 		"minimatch": "11.0.5",
 		"minisearch": "7.2.0",
 		"msw": "3.0.4",
+		"onesixty": "0.2.0",
 		"semver": "7.8.6",
 		"shell-quote": "^1.12.0",
 		"string-width": "8.3.0",
@@ -106,6 +108,7 @@
 		"tsx": "4.21.0",
 		"undici": "8.12.4",
 		"vite-plus": "catalog:",
+		"ws": "8.22.1",
 		"yargs": "18.2.0"
 	},
 	"engines": {

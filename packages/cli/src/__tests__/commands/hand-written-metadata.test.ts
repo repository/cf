@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
+import { handWrittenMeta } from "../../commands/hand-written-meta.js";
 import { loadableRootCommands } from "../../commands/root-commands.js";
 import type { CommandMeta } from "../../lib/metadata.js";
 
@@ -222,45 +223,18 @@ describe("hand-written-only command metadata", () => {
 		metadata.commands.map((command) => [command.command, command])
 	);
 
-	it("contains only hand-written commands", () => {
-		expect(commands.size).toBe(51);
-		expect(commands.has("cf pages deploy")).toBe(true);
-		expect(commands.has("cf tunnels diag")).toBe(true);
-		expect(commands.has("cf tunnels login")).toBe(true);
-		expect(commands.has("cf tunnels ready")).toBe(true);
-		expect(commands.has("cf tunnels tail")).toBe(true);
-		expect(commands.has("cf access login")).toBe(true);
-		expect(commands.has("cf access token")).toBe(true);
-		expect(commands.has("cf access ssh-config")).toBe(true);
-		expect(commands.has("cf access ssh-gen")).toBe(true);
-		expect(commands.has("cf access tcp")).toBe(true);
-		expect(commands.has("cf access curl")).toBe(true);
-		expect([...commands.keys()]).toEqual(
-			expect.arrayContaining([
-				"cf auth login",
-				"cf cli search",
-				"cf cli telemetry disable",
-				"cf cli telemetry enable",
-				"cf cli telemetry status",
-				"cf containers build",
-				"cf containers images delete",
-				"cf containers images list",
-				"cf containers push",
-				"cf deploy",
-				"cf docs search",
-				"cf init",
-				"cf init workers",
-				"cf migrate",
-				"cf d1 migrations create",
-				"cf workers triggers deploy",
-				"cf workers versions create",
-				"cf workers check",
-				"cf workers types",
-				"cf ai run",
-				"cf registrar registrations create",
-			])
+	it("contains exactly the commands declared by hand-written sidecars", () => {
+		const declared = [
+			...Object.values(handWrittenMeta.roots).flat(),
+			...Object.values(handWrittenMeta.subgroups).flat(),
+			...Object.values(handWrittenMeta.leaves),
+		].map((command) => command.command);
+		const overrides = Object.keys(handWrittenMeta.leafOverrides).map(
+			(key) => `cf ${key.replaceAll("/", " ")}`
 		);
-		expect(commands.has("cf dns records create")).toBe(false);
+		expect([...commands.keys()].sort()).toEqual(
+			[...declared, ...overrides].sort()
+		);
 	});
 
 	it("marks the CLI telemetry path as hand-written", () => {
